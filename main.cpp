@@ -58,10 +58,16 @@ int main() {
     glViewport(0, 0, fbw, fbh);
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL); // Use LEQUAL to handle co-planar surfaces better
+
     // Enable GPU backface culling to skip triangles facing away from the camera
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+
+    // Enable polygon offset to reduce z-fighting on co-planar surfaces
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(1.0f, 1.0f);
 
 
 
@@ -92,14 +98,20 @@ int main() {
         });
 
         // 7. Main render loop
+        static bool wireframeMode = false; // Declare wireframe state outside loop
+
         while (!glfwWindowShouldClose(window)) {
             // Input
             if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window, true);
             }
 
-            // Clear screen
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            // Clear screen (darker background in wireframe mode for better visibility)
+            if (wireframeMode) {
+                glClearColor(0.1f, 0.1f, 0.15f, 1.0f); // Dark blue-grey
+            } else {
+                glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // Normal teal
+            }
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // Update and render
@@ -138,6 +150,24 @@ int main() {
                 world.regenerateAllChunks();
             }
             regenPressedLast = regenPressed;
+
+            // Toggle wireframe mode with 'F' key (like Blender)
+            static bool wireframePressedLast = false;
+            bool wireframePressed = (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS);
+            if (wireframePressed && !wireframePressedLast) {
+                wireframeMode = !wireframeMode;
+                if (wireframeMode) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                    glDisable(GL_CULL_FACE); // See through the mesh
+                    glLineWidth(1.5f); // Slightly thicker lines for visibility
+                    std::cout << "Wireframe mode: ON (Press F to toggle)" << std::endl;
+                } else {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                    glEnable(GL_CULL_FACE); // Re-enable backface culling
+                    std::cout << "Wireframe mode: OFF" << std::endl;
+                }
+            }
+            wireframePressedLast = wireframePressed;
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
                 camera.ProcessKeyboard(Camera_Movement::BACKWARD, deltaTime);
             if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)

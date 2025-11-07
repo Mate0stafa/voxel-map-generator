@@ -25,49 +25,6 @@ void Chunk::setBlock(int x, int y, int z, Block block) {
     }
 }
 
-void Chunk::generateMesh() {
-    meshVertices.clear();
-
-    for (int y = 0; y < CHUNK_HEIGHT; y++) {
-        for (int z = 0; z < CHUNK_SIZE; z++) {
-            for (int x = 0; x < CHUNK_SIZE; x++) {
-                Block current = getBlock(x, y, z);
-                if (!current.isSolid()) continue;
-
-                // Check all 6 faces within this chunk only
-                if (x == 0 || !getBlock(x-1, y, z).isSolid()) 
-                    addFace({x, y, z}, {-1, 0, 0}, current.type);
-                if (x == CHUNK_SIZE-1 || !getBlock(x+1, y, z).isSolid())
-                    addFace({x, y, z}, {1, 0, 0}, current.type);
-                if (y == 0 || !getBlock(x, y-1, z).isSolid())
-                    addFace({x, y, z}, {0, -1, 0}, current.type);
-                if (y == CHUNK_HEIGHT-1 || !getBlock(x, y+1, z).isSolid())
-                    addFace({x, y, z}, {0, 1, 0}, current.type);
-                if (z == 0 || !getBlock(x, y, z-1).isSolid())
-                    addFace({x, y, z}, {0, 0, -1}, current.type);
-                if (z == CHUNK_SIZE-1 || !getBlock(x, y, z+1).isSolid())
-                    addFace({x, y, z}, {0, 0, 1}, current.type);
-            }
-        }
-    }
-
-    // Upload mesh to GPU
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, meshVertices.size() * sizeof(float), meshVertices.data(), GL_STATIC_DRAW);
-
-    // Vertex attributes (position + normal + color)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-
-    vertexCount = meshVertices.size() / 9;
-    needsMeshUpdate = false;
-}
-
 void Chunk::generateMeshWithWorld(const World& world) {
     meshVertices.clear();
 
@@ -104,6 +61,10 @@ void Chunk::generateMeshWithWorld(const World& world) {
         }
     }
     
+    uploadMeshToGPU();
+}
+
+void Chunk::uploadMeshToGPU() {
     // Upload mesh to GPU
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -124,9 +85,15 @@ void Chunk::generateMeshWithWorld(const World& world) {
 void Chunk::addFace(const glm::vec3& position, const glm::vec3& normal, BlockType type) {
     glm::vec3 color = Block{type}.getColor();
     
-    const float x = position.x;
-    const float y = position.y;
-    const float z = position.z;
+    // Small offset to prevent z-fighting at chunk boundaries
+    const float epsilon = 0.001f;
+    const float offsetX = normal.x * epsilon;
+    const float offsetY = normal.y * epsilon;
+    const float offsetZ = normal.z * epsilon;
+
+    const float x = position.x + offsetX;
+    const float y = position.y + offsetY;
+    const float z = position.z + offsetZ;
 
     auto pushVertex = [&](float px, float py, float pz) {
         meshVertices.push_back(px);

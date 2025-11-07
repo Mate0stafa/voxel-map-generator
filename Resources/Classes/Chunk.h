@@ -16,12 +16,10 @@ public:
     Block getBlock(int x, int y, int z) const;
     void setBlock(int x, int y, int z, Block block);
 
-    void generateMesh();
-    void render() const;
-
     // Generate mesh using world-aware neighbor checks (across chunk borders)
     void generateMeshWithWorld(const World& world);
-    
+    void render() const;
+
     bool needsMeshUpdate = true;
     glm::ivec2 position;
     
@@ -32,4 +30,5 @@ private:
     size_t vertexCount = 0;
     
     void addFace(const glm::vec3& position, const glm::vec3& normal, BlockType type);
+    void uploadMeshToGPU();
 };
